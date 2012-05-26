@@ -1,0 +1,63 @@
+.tlog_log{
+   background: #aaa;
+	border:solid 1px #121212;
+	font-family:Courier New, Courier, monospace;
+	font-size:11px;
+   height: 100%;
+   width: 100%;
+   /*
+	position:absolute;
+	bottom: 0px;
+	width: 998px;
+	height:120px;
+	margin:20px 0px;
+   */
+}
+
+.tlog_scrolledcontent{
+   overflow-y: scroll;
+   clear: both;
+}
+
+.tlog_logtimestamp{
+   display: inline-block;
+	color:#133013;
+	margin-left:5px;
+   width: 8em;
+}
+.tlog_logmessage{
+	margin-left: 5px;
+}
+.tlog_log .tlog_header{
+	height:15px;
+	background: #121212;
+	color: #ccc;
+	text-align: center;
+	font-size:12px;
+   font-weight: bold;
+}
+
+.tlog_log_error{
+   color: #E83623;
+}
+.tlog_log_warn{
+   color: #E88E0C;
+}
+.tlog_log_notice{
+   color: #ddd;
+}
+.tlog_log_debug{
+   color: #3AE815;
+}
+
+.tlog_header_button{
+    float: right;
+    padding-right: 10px;
+    cursor: pointer;
+}
+.tlog_header_button_disabled {
+  color: grey;
+  cursor: default;
+}
+
+

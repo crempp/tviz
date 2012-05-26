@@ -1,0 +1,23 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml"> 
+<head> 
+   <title>TA LOG</title> 
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+   
+   <link type='text/css' rel='stylesheet' media='screen' href='css/style.css' />
+   <script type='text/javascript' src='js/jquery.js'></script>
+   <script type='text/javascript' src='js/jquery.dlogger.js'></script>
+   <script type='text/javascript'>
+      $(function() {
+         _log = $('#logger').dlogger({logdiv:'logger',
+                                       height:235,
+                                       maxlines:500,
+                                       level:4});
+      });
+   </script>
+   
+</head>
+<body>
+   <div id='logger'></div>
+</body>
+</html>
