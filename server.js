@@ -5,16 +5,9 @@
  *
  *
 *******************************************************************************/
-var app     = require('http').createServer(handler),
-    io      = require('socket.io').listen(app),
-    url     = require("url"),
-    path    = require("path"),
-    fs      = require('fs')
-    mime    = require('mime'),
-    mongo   = require('mongodb'),
-    config  = require('./config'),
-    tlog    = require('./lib/tlog').tlog;
-
+// This is a quick hack to fix the backward-incompatible change in node 0.7
+// which moves the exists method from path to fs.
+var fs = require('fs')
 if (typeof fs.exists == 'function') {
     // node 0.7.x
 } else {
@@ -22,16 +15,26 @@ if (typeof fs.exists == 'function') {
     var path = require('path');
     fs.exists = path.exists; 
 }
-    
-var web_directory = 'public'
 
-app.listen(config.tviz.port);
+
+var app     = require('http').createServer(handler),
+    io      = require('socket.io').listen(app),
+    url     = require("url"),
+    path    = require("path"),
+    mime    = require('mime'),
+    mongo   = require('mongodb'),
+    config  = require('./config'),
+    tlog    = require('./lib/tlog').tlog;
+
+
+
+app.listen(config.server.port);
 
 function handler (request, response) {
     tlog.debug("http connection");
 
     var uri = url.parse(request.url).pathname,
-        filename = path.join(config.app_root, web_directory, uri);
+        filename = path.join(config.app_root, config.server.web_directory, uri);
   
   tlog.debug("Requested - " + filename);
   

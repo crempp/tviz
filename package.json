@@ -1,0 +1,50 @@
+{
+  "name": "tviz",
+  "preferGlobal": "true",
+  "version": "0.0.1",
+  "author": "Chad Rempp <crempp@gmail.com>",
+  "description": "Twitter visualization tool",
+  "contributors": [ 
+    {
+      "name": "Chad Rempp",
+      "email": "crempp@gmail.com"
+    } 
+  ],
+  "bin": {
+    "tviz-server": "./bin/tviz-server"
+  },
+  "scripts": {
+    "start": "node ./bin/tviz-server",
+    "test": "vows --spec --isolate"
+  },
+  "main": "./lib/tviz-server",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/crempp/tviz.git"
+  },
+  "keywords": [
+    "twitter",
+    "visualization",
+    "3D",
+    "server"
+  ],
+  "dependencies" : {
+    "twitter"     :  "0.1.x",
+    "socket.io"   :  "0.9.x",
+    "mongodb"     :  "1.0.x",
+    "winston"     :  "0.5.x",
+    "mime"        :  "1.2.x",
+    "cloneextend" :  "0.0.3"
+  },
+  "noAnalyze": true,
+  "devDependencies": {
+    "vows"    :  "0.5.x",
+    "request" :  "2.1.x"
+  },
+  "bundleDependencies": [
+  ],
+  "license": "MIT",
+  "engine": {
+    "node": ">=0.7"
+  }
+}
