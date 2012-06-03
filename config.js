@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 var config = {
-    app_root: '/fileserver/documents/projects/tviz',
+    app_root: '/srv/tviz',
     
     // Twitter configuration
     twitter: {
@@ -34,8 +34,7 @@ var config = {
     },
     
     tviz: {
-        
-        port: 8080
+        port: 8081
     }
 }
 

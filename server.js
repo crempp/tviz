@@ -9,21 +9,31 @@ var app     = require('http').createServer(handler),
     io      = require('socket.io').listen(app),
     url     = require("url"),
     path    = require("path"),
-    fs      = require('fs'),
+    fs      = require('fs')
+    mime    = require('mime'),
     mongo   = require('mongodb'),
     config  = require('./config'),
     tlog    = require('./lib/tlog').tlog;
+
+if (typeof fs.exists == 'function') {
+    // node 0.7.x
+} else {
+    // node < 0.6.x
+    var path = require('path');
+    fs.exists = path.exists; 
+}
     
 var web_directory = 'public'
 
 app.listen(config.tviz.port);
 
 function handler (request, response) {
+    tlog.debug("http connection");
 
-  var uri = url.parse(request.url).pathname,
-      filename = path.join(config.app_root, web_directory, uri);
+    var uri = url.parse(request.url).pathname,
+        filename = path.join(config.app_root, web_directory, uri);
   
-  tlog.debug(filename);
+  tlog.debug("Requested - " + filename);
   
   fs.exists(filename, function(exists) {
     if(!exists) {
@@ -33,7 +43,7 @@ function handler (request, response) {
       return;
     }
 
-	if (fs.statSync(filename).isDirectory()) filename += '/index.html';
+    if (fs.statSync(filename).isDirectory()) filename += '/index.html';
 
     fs.readFile(filename, "binary", function(err, file) {
       if(err) {        
@@ -43,7 +53,11 @@ function handler (request, response) {
         return;
       }
 
-      response.writeHead(200);
+      tlog.debug("file: " + filename + " type : " + mime.lookup(file));
+
+      response.writeHead(200, {
+          'Content-Type': mime.lookup(filename)
+      });
       response.write(file, "binary");
       response.end();
     });
@@ -59,12 +73,13 @@ var Server      = mongo.Server,
         config.mongodb.database_port,
         config.mongodb.database_options
     );
+
 var db = new Db(config.mongodb.database_name, mongoServer);
 
 db.open(function(err, db) {
         if(!err) {
             //self.emit('db_connected');
-            console.log('db_connected');
+            tlog.debug('Connected to database');
         } else {
             //self.emit('db_connect_error', err);
             console.log('db_connect_error');
@@ -73,6 +88,7 @@ db.open(function(err, db) {
 
 
 io.sockets.on('connection', function (socket) {
+    tlog.debug("socket connection");
     socket.emit('started', { data: "TEST" });
     
 	var ErrorMap = {

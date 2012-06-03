@@ -428,7 +428,7 @@ function connect(cb){
 
     // Global the socket for testing
     //var socket = io.connect('http://localhost');
-    socket = io.connect('http://localhost');
+    socket = io.connect('http://10.0.1.50');
 
     cb();
     

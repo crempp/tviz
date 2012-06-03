@@ -1,0 +1,7 @@
+#/bin/bash
+
+CUR_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# TODO: Check for node
+
+node $CUR_DIR/server.js
