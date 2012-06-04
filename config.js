@@ -14,6 +14,12 @@ if (typeof fs.exists == 'function') {
     // node < 0.6.x
     var path = require('path');
     fs.exists = path.exists;
+}
+if (typeof fs.existsSync == 'function') {
+    // node 0.7.x
+} else {
+    // node < 0.6.x
+    var path = require('path');
     fs.existsSync = path.existsSync;
 }
 

@@ -428,7 +428,7 @@ function connect(cb){
 
     // Global the socket for testing
     //var socket = io.connect('http://localhost');
-    socket = io.connect('http://10.0.1.50');
+    socket = io.connect('http://10.0.1.53');
 
     cb();
     
@@ -439,7 +439,7 @@ function connect(cb){
         
         var query = {"data.geo" : {$ne: null}};
         
-        //socket.emit('get_result', query);
+        socket.emit('get_result', query);
     });
     
     socket.on('result', function (data) {
