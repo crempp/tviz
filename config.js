@@ -62,7 +62,11 @@ var config = {
     },
     
     client: {
+        io_url : '/',
         
+        timeline : {
+            map_image : '/assets/images/map_01.png',
+        }
     }
 };
 

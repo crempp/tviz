@@ -104,14 +104,14 @@ var TimeLine = {
         linewidth: 1
     }),
     cursorMapMaterial : new THREE.MeshBasicMaterial({
-        map: THREE.ImageUtils.loadTexture( "/assets/images/map_01.png" ),
+        map: THREE.ImageUtils.loadTexture(config.timeline.map_image),
         blending: THREE.AlphaBlending,
         transparent: true,
         color: 0x0000FF
     }),
     
     nowMapMaterial : new THREE.MeshBasicMaterial({
-        map: THREE.ImageUtils.loadTexture( "/assets/images/map_01.png" ),
+        map: THREE.ImageUtils.loadTexture(config.timeline.map_image),
         blending: THREE.AlphaBlending,
         transparent: true,
         color: 0x0000FF
@@ -428,7 +428,7 @@ function connect(cb){
 
     // Global the socket for testing
     //var socket = io.connect('http://localhost');
-    socket = io.connect('http://10.0.1.50');
+    socket = io.connect(config.io_url);
 
     cb();
     
@@ -439,7 +439,7 @@ function connect(cb){
         
         var query = {"data.geo" : {$ne: null}};
         
-        //socket.emit('get_result', query);
+        socket.emit('get-result', query);
     });
     
     socket.on('result', function (data) {

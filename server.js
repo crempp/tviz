@@ -30,41 +30,58 @@ var app     = require('http').createServer(handler),
 
 app.listen(config.server.port);
 
+/**
+ * HTTP request handler
+ * 
+ * If the pages become too complex this should be replaced with express
+ */
 function handler (request, response) {
-    tlog.debug("http connection");
-
-    var uri = url.parse(request.url).pathname,
+    
+    var uri      = url.parse(request.url).pathname,
         filename = path.join(config.app_root, config.server.web_directory, uri);
-  
-  tlog.debug("Requested - " + filename);
-  
-  fs.exists(filename, function(exists) {
-    if(!exists) {
-      response.writeHead(404, {"Content-Type": "text/plain"});
-      response.write("404 Not Found\n");
-      response.end();
-      return;
-    }
-
-    if (fs.statSync(filename).isDirectory()) filename += '/index.html';
-
-    fs.readFile(filename, "binary", function(err, file) {
-      if(err) {        
-        response.writeHead(500, {"Content-Type": "text/plain"});
-        response.write(err + "\n");
+    
+    tlog.debug("Request [" + request.connection.remoteAddress + "] - " + uri);
+    
+    // Special requests
+    if (uri == '/tviz_config.js'){
+        var client_config = "var config = " + JSON.stringify(config.client) + ";";
+        
+        response.writeHead(200, {"Content-Type": "application/javascript"});
+        response.write(client_config + "\n");
         response.end();
         return;
-      }
-
-      tlog.debug("file: " + filename + " type : " + mime.lookup(file));
-
-      response.writeHead(200, {
-          'Content-Type': mime.lookup(filename)
-      });
-      response.write(file, "binary");
-      response.end();
+    }
+    
+    fs.exists(filename, function(exists) {
+        if(!exists) {
+            response.writeHead(404, {"Content-Type": "text/plain"});
+            response.write("404 Not Found\n");
+            response.end();
+            return;
+        }
+        
+        // Handle directories
+        if (fs.statSync(filename).isDirectory()) {
+            filename += '/index.html';
+        }
+        
+        fs.readFile(filename, "binary", function(err, file) {
+            if(err) {        
+                response.writeHead(500, {"Content-Type": "text/plain"});
+                response.write(err + "\n");
+                response.end();
+                return;
+            }
+            
+            //tlog.debug("file: " + filename + " type : " + mime.lookup(file));
+            
+            response.writeHead(200, {
+                'Content-Type': mime.lookup(filename)
+            });
+            response.write(file, "binary");
+            response.end();
+        });
     });
-  });
 }
 
 
