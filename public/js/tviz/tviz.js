@@ -45,6 +45,9 @@ function resizeScreen(){
 function initializeViz() {
     _log.notice("Initializing vizualization software...");
     
+    // Start the timer
+    Timer.start();
+    
     // get the DOM element to attach to
     // - assume we've got jQuery to hand
     var $viz_container = $('#viz_wrapper');
@@ -428,7 +431,9 @@ function connect(cb){
 
     // Global the socket for testing
     //var socket = io.connect('http://localhost');
-    socket = io.connect(config.io_url);
+    socket = io.connect(config.io_url,{
+        // Options
+    });
 
     cb();
     
@@ -450,8 +455,117 @@ function connect(cb){
     });
     
     
-    socket.on('res-time-sync', function (data) {
-        _log.debug("[IO] Received result {res-time-sync}");
-        console.log(data)
-    });
+    //socket.on('res-time-sync', function (data) {
+    //    _log.debug("[IO] Received result {res-time-sync}");
+    //    console.log(data)
+    //});
+}
+
+/**
+ * The timer
+ *
+ * There is an intention to make the timer resolution configurable and sync to
+ * the server periodically. This proved to be difficult so currently the timer
+ * only does one sync at startup and only has a resolution of one minute.
+*/
+var Timer = {
+    // Remeber if we've been started
+    _started : false,
+    
+    // Timer resolution (milliseconds)
+    _resolution : 60000, // 1 mintute
+    
+    // Inverval between server syncronizations (milliseconds)
+    //_syncinterval : 180000, // 3 minutes
+    _syncinterval : 0, // 30 seconds
+    
+    // Last time a server sync occurred
+    _lastsync : null,
+    
+    // The time from the most recent clock tick
+    _curTick : null,
+    
+    // Timeout reference
+    _to : null,
+    
+    // Is there an outstanding request?
+    _waitingOnReq : false,
+    
+    /**
+     * Start the timer
+    */
+    start : function() {
+        if ( ! this._started ) {
+            console.log("starting timer");
+            this._curTick = Date.now();
+            
+            // Setup communication handlers
+            socket.on('res-time-sync', this._sync.bind(this));
+            
+            // Start the timer
+            //this._to = window.setTimeout(this._tick, this._timeToNextInterval(), this);
+            this._tick(this);
+            
+            this._started = true;
+        }
+    },
+    
+    /**
+     * Tick the timer clock
+    */
+    _tick : function(self) {
+        // Update time
+        self._curTick = Date.now();
+        
+        console.log("tick : " + Date(self._curTick));
+        
+        // Initiate a server sync if it's time
+        if (self._lastsync === null ||
+            self._curTick - self._lastsync > self._syncinterval) {
+            console.log("asking for sync");
+            
+            // Update sync time
+            self._lastsync = self._curTick;
+            
+            if ( ! self._waitingOnReq ) {
+                socket.emit('req-time-sync', {ts: Date.now()});
+            
+                // Remeber that we have an outstanding request so we don't send a
+                // request flood
+                self._waitingOnReq = true;
+            }
+        }
+        
+        // Fire tick event
+        $(window).trigger('clock-update', [{curTick : self._curTick}]);
+        
+        self._to = window.setTimeout(self._tick, self._timeToNextInterval(), self);
+    },
+    
+    /**
+     * Handle a server syncronization response
+    */
+    _sync : function(data) {
+        console.log("Sync response");
+        
+        self._waitingOnReq = false;
+        
+        this._curTick = (data.ts + data.tco);
+    },
+    
+    _timeToNextInterval : function(){
+        var d1 = new Date(this._curTick),
+            ttni;
+        
+        //if (this._lastsync) {
+        //    ttni = this._lastsync + this._resolution - Date.now();
+        //} else {
+        //    // This is broke
+        //    ttni = 0;
+        //}
+        
+        ttni = 60 - (new Date()).getSeconds();
+        
+        return ttni * 1000;
+    }
 }

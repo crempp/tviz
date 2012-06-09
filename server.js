@@ -27,6 +27,13 @@ var app     = require('http').createServer(handler),
     tlog    = require('./lib/tlog').tlog;
 
 
+// TODO: move this to config.js
+io.configure('production', function(){
+    io.set('log level', 1);
+});
+io.configure('development', function(){
+    io.set('log level', 3);
+});
 
 app.listen(config.server.port);
 
