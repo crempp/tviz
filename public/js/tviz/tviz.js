@@ -496,7 +496,6 @@ var Timer = {
     */
     start : function() {
         if ( ! this._started ) {
-            console.log("starting timer");
             this._curTick = Date.now();
             
             // Setup communication handlers
@@ -517,12 +516,9 @@ var Timer = {
         // Update time
         self._curTick = Date.now();
         
-        console.log("tick : " + Date(self._curTick));
-        
         // Initiate a server sync if it's time
         if (self._lastsync === null ||
             self._curTick - self._lastsync > self._syncinterval) {
-            console.log("asking for sync");
             
             // Update sync time
             self._lastsync = self._curTick;
@@ -546,8 +542,6 @@ var Timer = {
      * Handle a server syncronization response
     */
     _sync : function(data) {
-        console.log("Sync response");
-        
         self._waitingOnReq = false;
         
         this._curTick = (data.ts + data.tco);

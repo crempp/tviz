@@ -1,14 +1,12 @@
 
 tvizui = {
     build : function (){
-        console.log("building gui")
         // Accordion containers
         $("#tviz-accordion").accordion({
             fillSpace: true
         });
         
         $(window).bind('clock-update', function(event, timer_data){
-            console.log("gui clock update");
             var d = new Date(timer_data.curTick);
             
             var t_string = d.getFullYear() + '-' +
