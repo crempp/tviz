@@ -355,10 +355,11 @@ function drawData(data)
 
 function MillerCylindricalToXY(pos){
     var latScale = 1,
-        lonScale = 1;
+        lonScale = 20;
     
     return [pos[0] * latScale,
-            (5/4) * Math.log(Math.tan( (1/4) * PI + (2/5) * pos[1] )) * lonScale]
+            (5/4) * Math.log(Math.tan( (1/4) * PI + (2/5) * pos[1] )) * lonScale];
+            //0];
 }
 
 function lighting()
