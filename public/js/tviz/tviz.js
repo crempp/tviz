@@ -10,6 +10,8 @@ var sphere, uniforms, attributes;
 var vc1;
 var conn;
 
+var clock = new THREE.Clock();
+
 var WIDTH = window.innerWidth,
     HEIGHT = window.innerHeight;
 
@@ -45,6 +47,8 @@ function resizeScreen(){
 function initializeViz() {
     _log.notice("Initializing vizualization software...");
     
+    if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+    
     // Start the timer
     Timer.start();
     
@@ -59,10 +63,9 @@ function initializeViz() {
     // and a scene
     renderer = new THREE.WebGLRenderer();
     
+    TimeLine.init();
     
     VizControls.initCamera();
-    
-    TimeLine.draw();
     
     lighting();
     
@@ -79,10 +82,9 @@ function initializeViz() {
     $viz_container.append(renderer.domElement);
     
     stats = new Stats();
-    stats.domElement.style.position = 'absolute';
-    stats.domElement.style.top = '20px';
-    stats.domElement.style.right = '0px';
-    $viz_container.append( stats.domElement );
+    
+    // TODO: Move this to tviz_ui
+    $('#stats-container').append( stats.domElement );
     
     animate(new Date().getTime());
     
@@ -93,134 +95,287 @@ function initializeViz() {
  *
 */
 var TimeLine = {
-    // Settings
-    _map_h : 100,
-    _map_w : 100 * (1357 / 758),
-    _time_coord_scale : 7.500432774971116e-10,
+    /**
+     * Time line properties
+     */
+    properties : {
+        /** Value to used to scale the timestamp for x coordinates */
+        //time_coord_scale : 7.500432774971116e-10,
+        time_coord_scale : 0.000000072,
+        
+        timeOffset : 95993,
+        
+        beginning_of_time : null,
+        end_of_time : null,
+        
+        height : 100,
+        width  : 100 * (1357 / 758),
+        h_2    : null,
+        w_2    : null,
+        ul     : {y: null, z: null},
+        ur     : {y: null, z: null},
+        lr     : {y: null, z: null},
+        ll     : {y: null, z: null},
+        begin  : null,
+        end    : null,
+        
+        // Materials
+        lineMaterial : new THREE.LineBasicMaterial({
+            color: 0x000099,
+            blending: THREE.AdditiveBlending,
+            linewidth: 3
+        }),
+        cursorMapMaterial : new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture(config.timeline.map_image),
+            blending: THREE.AlphaBlending,
+            transparent: true,
+            color: 0x0000FF
+        }),
+        nowMapMaterial : new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture(config.timeline.map_image),
+            blending: THREE.AlphaBlending,
+            transparent: true,
+            color: 0x0000FF
+        }),
+        
+        calc : function() {
+            this.beginning_of_time = new Date(2012, 3, 1).getTime();
+            this.end_of_time = Timer.getTime();
+            this.h_2   = this.height/2;
+            this.w_2   = this.width/2;
+            this.ul    = {y:  this.h_2, z:  this.w_2};
+            this.ur    = {y:  this.h_2, z: -this.w_2};
+            this.lr    = {y: -this.h_2, z: -this.w_2};
+            this.ll    = {y: -this.h_2, z:  this.w_2};
+            this.begin = - (TimeLine.convertTimeToX(this.beginning_of_time));
+            this.end   = (TimeLine.convertTimeToX(this.end_of_time));
+        }
+    },
     
     cursorTime : null,
     
-    // Materials
-    lineMaterial : new THREE.LineBasicMaterial({
-        color: 0x000099,
-        blending: THREE.AdditiveBlending,
-        linewidth: 1
-    }),
-    cursorMapMaterial : new THREE.MeshBasicMaterial({
-        map: THREE.ImageUtils.loadTexture(config.timeline.map_image),
-        blending: THREE.AlphaBlending,
-        transparent: true,
-        color: 0x0000FF
-    }),
+    cursorIsCurrent : true,
     
-    nowMapMaterial : new THREE.MeshBasicMaterial({
-        map: THREE.ImageUtils.loadTexture(config.timeline.map_image),
-        blending: THREE.AlphaBlending,
-        transparent: true,
-        color: 0x0000FF
-    }),
+    mapNow    : null,
+    mapCursor : null,
     
-    beginning_of_time : new Date(2012, 3, 1).getTime(),
-    end_of_time : new Date().getTime(),
+    init : function(){
+        // Calculate the properties
+        this.properties.calc();
+        
+        this.cursorTime = this.properties.end_of_time;
+        
+        // Setup events
+        $(window).bind('clock-tick', $.proxy(this._handleTick, this));
+        
+        this.draw();
+    },
+    
     
     /**
-     * Draw the map and time axis
+     * Draw the timeline
      *
      * 
     */
     draw : function(){
         // Container objects
-        var timeAxis = new THREE.Object3D(),
-            map = new THREE.Object3D();
-        
-        // Calculate the beginning and end coordinates
-        var begin = -this.beginning_of_time * this._time_coord_scale,
-            end = 0;
-        
-        // Calculate coordinates of the corners of the map.
-        var h_2 = this._map_h/2,
-            w_2 = this._map_w/2;
-        var ul = {y:  h_2, z:  w_2},
-            ur = {y:  h_2, z: -w_2},
-            lr = {y: -h_2, z: -w_2},
-            ll = {y: -h_2, z:  w_2};
+        var timeAxis = new THREE.Object3D();
         
         // Upper left
         var l1_geom = new THREE.Geometry();
-        l1_geom.vertices.push(new THREE.Vector3(begin, ul.y, ul.z));
-        l1_geom.vertices.push(new THREE.Vector3(end, ul.y, ul.z));
-        l1 = new THREE.Line( l1_geom , this.lineMaterial );
+        l1_geom.vertices.push(new THREE.Vector3(this.properties.begin, this.properties.ul.y, this.properties.ul.z));
+        l1_geom.vertices.push(new THREE.Vector3(this.properties.end, this.properties.ul.y, this.properties.ul.z));
+        l1 = new THREE.Line( l1_geom , this.properties.lineMaterial );
         l1.dynamic = true;
         timeAxis.add(l1);
         // Upper right
         var l2_geom = new THREE.Geometry();
-        l2_geom.vertices.push(new THREE.Vector3(begin, ur.y, ur.z));
-        l2_geom.vertices.push(new THREE.Vector3(end, ur.y, ur.z));
-        l2 = new THREE.Line( l2_geom , this.lineMaterial );
+        l2_geom.vertices.push(new THREE.Vector3(this.properties.begin, this.properties.ur.y, this.properties.ur.z));
+        l2_geom.vertices.push(new THREE.Vector3(this.properties.end, this.properties.ur.y, this.properties.ur.z));
+        l2 = new THREE.Line( l2_geom , this.properties.lineMaterial );
         l2.dynamic = true;
         timeAxis.add(l2);
         // Lower right
         var l3_geom = new THREE.Geometry();
-        l3_geom.vertices.push(new THREE.Vector3(begin, lr.y, lr.z));
-        l3_geom.vertices.push(new THREE.Vector3(end, lr.y, lr.z));
-        l3 = new THREE.Line( l3_geom , this.lineMaterial );
+        l3_geom.vertices.push(new THREE.Vector3(this.properties.begin, this.properties.lr.y, this.properties.lr.z));
+        l3_geom.vertices.push(new THREE.Vector3(this.properties.end, this.properties.lr.y, this.properties.lr.z));
+        l3 = new THREE.Line( l3_geom , this.properties.lineMaterial );
         l3.dynamic = true;
         timeAxis.add(l3);
         // Lower left
         var l4_geom = new THREE.Geometry();
-        l4_geom.vertices.push(new THREE.Vector3(begin, ll.y, ll.z));
-        l4_geom.vertices.push(new THREE.Vector3(end, ll.y, ll.z));
-        l4 = new THREE.Line( l4_geom , this.lineMaterial );
+        l4_geom.vertices.push(new THREE.Vector3(this.properties.begin, this.properties.ll.y, this.properties.ll.z));
+        l4_geom.vertices.push(new THREE.Vector3(this.properties.end, this.properties.ll.y, this.properties.ll.z));
+        l4 = new THREE.Line( l4_geom , this.properties.lineMaterial );
         l4.dynamic = true;
         timeAxis.add(l4);
         
-        // Upper left to upper right
-        var l12_geom = new THREE.Geometry();
-        l12_geom.vertices.push(new THREE.Vector3(0, ul.y, ul.z));
-        l12_geom.vertices.push(new THREE.Vector3(0, ur.y, ur.z));
-        l12 = new THREE.Line( l12_geom , this.lineMaterial );
-        l12.dynamic = true;
-        map.add(l12);
-        // Upper right to lower right
-        var l23_geom = new THREE.Geometry();
-        l23_geom.vertices.push(new THREE.Vector3(0, ur.y, ur.z));
-        l23_geom.vertices.push(new THREE.Vector3(0, lr.y, lr.z));
-        l23 = new THREE.Line( l23_geom , this.lineMaterial );
-        l23.dynamic = true;
-        map.add(l23);
-        // Lower right to lower left
-        var l34_geom = new THREE.Geometry();
-        l34_geom.vertices.push(new THREE.Vector3(0, lr.y, lr.z));
-        l34_geom.vertices.push(new THREE.Vector3(0, ll.y, ll.z));
-        l34 = new THREE.Line( l34_geom , this.lineMaterial );
-        l34.dynamic = true;
-        map.add(l34);
-        // Lower left to upper left
-        var l41_geom = new THREE.Geometry();
-        l41_geom.vertices.push(new THREE.Vector3(0, ll.y, ll.z));
-        l41_geom.vertices.push(new THREE.Vector3(0, ul.y, ul.z));
-        l41 = new THREE.Line( l41_geom , this.lineMaterial );
-        l41.dynamic = true;
-        map.add(l41);
+        this.mapNow = Object.create(this.Map, {'_properties' : {value : this.properties, enumerable: false}});
+        this.mapNow.draw();
         
-        // Draw Map
-        var map_geometry = new THREE.PlaneGeometry(this._map_w, this._map_h);
-        var map_mesh = new THREE.Mesh(map_geometry, this.cursorMapMaterial);
-        map_mesh.doubleSided = true;
-        map_mesh.rotation.x =  PI_2;
-        map_mesh.rotation.z = -PI_2;
-        map.add(map_mesh);
+        this.mapCursor = Object.create(this.Map, {'_properties' : {value : this.properties, enumerable: false}});
+        this.mapCursor.draw();
         
-        scene.add(map);
         scene.add(timeAxis);
+    },
+    
+    updateTimeline : function() {
+        this.properties.calc();
+        this.mapNow._mapObj.position.x = this.properties.end
+    },
+    
+    updateCursor : function(delta) {
+        var reasonableResolution = 60000 * 60 * 24; // One day
+        
+        if (delta > 0) {
+            // Go forward in time
+            var newTime = this.cursorTime + reasonableResolution;
+            
+            // Is new time in the same day as end_of_time?
+            var eotDate = new Date(this.properties.end_of_time),
+                newTimeDate = new Date(newTime);
+            var newTimeIsEOTPlusOne = (
+                eotDate.getFullYear() == newTimeDate.getFullYear() &&
+                eotDate.getMonth() == newTimeDate.getMonth() &&
+                (parseInt(eotDate.getDate(), 10) + 1) == (parseInt(newTimeDate.getDate(), 10))
+            );
+            
+            if (! newTimeIsEOTPlusOne) {
+                // newTime is not current
+                var posDelta = this.convertTimeToX(newTime) - this.convertTimeToX(this.cursorTime);
+                
+                // Move cursor to new time
+                this.mapCursor._mapObj.position.setX(this.mapCursor._mapObj.position.x + posDelta);
+                
+                // Set cursor time to new time
+                this.cursorTime = newTime;
+                
+                $(window).trigger('clock-update', [{
+                    cursorTime : this.cursorTime,
+                    currentTime: Timer.getTime()
+                }]);
+                
+                this.cursorIsCurrent = false;
+            } else {
+                this.cursorIsCurrent = true;
+            }
+            
+        } else if (delta < 0) {
+            // Go backward in time
+            var newTime = this.cursorTime - reasonableResolution;
+            
+            if (newTime >= this.properties.beginning_of_time) {
+                var posDelta = this.convertTimeToX(this.cursorTime) - this.convertTimeToX(newTime);
+                this.mapCursor._mapObj.position.setX(this.mapCursor._mapObj.position.x - posDelta);
+                
+                this.cursorTime = newTime;
+                $(window).trigger('clock-update', [{
+                    cursorTime : this.cursorTime,
+                    currentTime: Timer.getTime()
+                }]);
+            }
+            
+            this.cursorIsCurrent = false;
+        }
+        
+        
+    },
+    
+    updateNow : function(time) {
+        
+    },
+    
+    convertTimeToX : function (time) {
+        return (( time) * this.properties.time_coord_scale) - this.properties.timeOffset;
+    },
+    
+    _handleTick : function(event, timer_data) {
+        
+        // Extend the timeline
+        this.updateTimeline();
+        
+        // Fire the clock update if the cursor is located at the end-of-time
+        if (this.cursorIsCurrent) {
+            this.cursorTime = timer_data.curTick;
+            
+            $(window).trigger('clock-update', [{
+                cursorTime : this.cursorTime,
+                currentTime: timer_data.curTick
+            }]);
+        }
+    },
+    
+    /**
+     * Map representation object
+     */
+    Map : {
+        _properties : null,
+        
+        _time : null,
+        
+        _mapObj : null,
+        
+        draw : function(){
+            self = this;
+            
+            this._mapObj = new THREE.Object3D();
+            
+            if (self._properties === null) {
+                throw "No properties reference for map object. Did you forget to set the _properties property?"
+                // Throw exception
+            }
+            
+            // Upper left to upper right border
+            var l12_geom = new THREE.Geometry();
+            l12_geom.vertices.push(new THREE.Vector3(0, self._properties.ul.y, self._properties.ul.z));
+            l12_geom.vertices.push(new THREE.Vector3(0, self._properties.ur.y, self._properties.ur.z));
+            l12 = new THREE.Line( l12_geom , self._properties.lineMaterial );
+            l12.dynamic = true;
+            this._mapObj.add(l12);
+            // Upper right to lower right border
+            var l23_geom = new THREE.Geometry();
+            l23_geom.vertices.push(new THREE.Vector3(0, self._properties.ur.y, self._properties.ur.z));
+            l23_geom.vertices.push(new THREE.Vector3(0, self._properties.lr.y, self._properties.lr.z));
+            l23 = new THREE.Line( l23_geom , self._properties.lineMaterial );
+            l23.dynamic = true;
+            this._mapObj.add(l23);
+            // Lower right to lower left border
+            var l34_geom = new THREE.Geometry();
+            l34_geom.vertices.push(new THREE.Vector3(0, self._properties.lr.y, self._properties.lr.z));
+            l34_geom.vertices.push(new THREE.Vector3(0, self._properties.ll.y, self._properties.ll.z));
+            l34 = new THREE.Line( l34_geom , self._properties.lineMaterial );
+            l34.dynamic = true;
+            this._mapObj.add(l34);
+            // Lower left to upper left border
+            var l41_geom = new THREE.Geometry();
+            l41_geom.vertices.push(new THREE.Vector3(0, self._properties.ll.y, self._properties.ll.z));
+            l41_geom.vertices.push(new THREE.Vector3(0, self._properties.ul.y, self._properties.ul.z));
+            l41 = new THREE.Line( l41_geom , self._properties.lineMaterial );
+            l41.dynamic = true;
+            this._mapObj.add(l41);
+            
+            // Draw Map
+            var map_geometry = new THREE.PlaneGeometry(self._properties.width, self._properties.height);
+            var map_mesh = new THREE.Mesh(map_geometry, self._properties.cursorMapMaterial);
+            
+            map_mesh.doubleSided = true;
+            map_mesh.rotation.x =  PI_2;
+            map_mesh.rotation.z = -PI_2;
+            
+            this._mapObj.add(map_mesh);
+            
+            this._mapObj.position.setX(self._properties.end);
+            
+            scene.add(this._mapObj);
+        }
     },
     
     /**
      * Update time axis with current time
-    */
+     */
     tick : function(){
         var now = new Date.getTime();
-        var nowCoord = now * this._time_coord_scale;
+        var nowCoord = now * this.properties.time_coord_scale;
     }
 };
 
@@ -230,7 +385,8 @@ var VizControls = {
     near      : 0.1,
     far       : 10000,
     
-    camera : null,
+    camera   : null,
+    controls : null,
     
     initCamera : function(){
         this.camera = new THREE.PerspectiveCamera(
@@ -239,44 +395,42 @@ var VizControls = {
             this.near,
             this.far
         );
-        // the camera starts at 0,0,0
-        // so pull it back
-        this.camera.position.z = 300;
+        
+        // Set the camera's initial position.
+        // The camera should follow the cursor but we cant trust that the
+        // cursor has been initialized yet so we will put the camera near the
+        // end-of-time position.
+        this.camera.position.x = TimeLine.properties.end + 300;
+        this.camera.position.y = 0;
+        this.camera.position.z = 0;
+        
+        this.camera.lookAt(TimeLine.mapCursor._mapObj.position);
         
         scene.add(this.camera);
     },
+    
     init : function(){
-        // Setup Controls
-        controls = new THREE.TrackballControls( this.camera );
-        
-        controls.rotateSpeed = 1.0;
-        controls.zoomSpeed = 1.2;
-        controls.panSpeed = 0.8;
-        
-        controls.noZoom = false;
-        controls.noPan = false;
-        
-        controls.staticMoving = true;
-        controls.dynamicDampingFactor = 0.3;
-        
-        controls.keys = [ 65, 83, 68 ];
-        
-        controls.addEventListener( 'change', render );
-        
         // Setup controls
-        controls = new THREE.TrackballControls( this.camera, renderer.domElement );
-        controls.target.set( 0, 0, 0 );
+        this.controls = new THREE.TrackballControls( this.camera, renderer.domElement );
+        
+        this.controls.target.set(TimeLine.properties.end,
+                                 TimeLine.mapCursor._mapObj.position.y,
+                                 TimeLine.mapCursor._mapObj.position.z);
+        
+        this.controls.rotateSpeed = 1.0;
+        this.controls.zoomSpeed   = 1.2;
+        this.controls.panSpeed    = 0.8;
+        this.controls.noZoom      = false;
+        this.controls.noPan       = false;
+        this.controls.dynamicDampingFactor = 0.1;
+        this.controls.keys        = [ 65, 83, 68 ];
         
         window.addEventListener('DOMMouseScroll', this.onDocumentMouseWheel, false);
         window.addEventListener('mousewheel', this.onDocumentMouseWheel, false);
     },
     
     onDocumentMouseWheel : function ( event ) {
-        console.log(event.wheelDeltaY);
-        
-        
-        //var fov = VizControls.camera.fov - event.wheelDeltaY * 0.05;
-        //VizControls.camera.projectionMatrix = THREE.Matrix4.makePerspective( fov, window.innerWidth / window.innerHeight, 1, 1100 );
+        TimeLine.updateCursor(event.wheelDeltaY);
     }
 };
 
@@ -299,10 +453,6 @@ function drawData(data)
         segments = 8,
         rings    = 8;
     
-    var zeroTime = 1333238400000, //Sun Apr 1 00:00:00 +0000 2012 GMT
-        timeScale = 0.000000072, //
-        timeOffset = 95993;
-        
     // Group data by timestamp
     //var groups = {};
     //for (var i = 0; i < data.length; i++){
@@ -321,9 +471,7 @@ function drawData(data)
     
     //console.log(data.length + " tweets")
     for (var i = 0; i < data.length; i++){
-        //console.log(data[i].t)
-        var scaledTime = ( data[i].t * timeScale ) - timeOffset;
-        //console.log("   x = " + scaledTime);
+        var scaledTime = TimeLine.convertTimeToX(data[i].t);
         
         var sphere = new THREE.Mesh(
           new THREE.SphereGeometry(
@@ -333,12 +481,7 @@ function drawData(data)
           sphereMaterial
         );
         
-        //sphere.position.x = Math.floor((Math.random() * 200) + 1) - 100;
-        //sphere.position.y = Math.floor((Math.random() * 200) + 1) - 100;
-        //sphere.position.z = Math.floor((Math.random() * 200) + 1) - 100;
-        
-        //console.log(data[i].g.coordinates)
-        sphere.position.x = -scaledTime;
+        sphere.position.x = TimeLine.convertTimeToX(data[i].t);
         
         newPos = MillerCylindricalToXY(data[i].g.coordinates)
         
@@ -359,7 +502,6 @@ function MillerCylindricalToXY(pos){
     
     return [pos[0] * latScale,
             (5/4) * Math.log(Math.tan( (1/4) * PI + (2/5) * pos[1] )) * lonScale];
-            //0];
 }
 
 function lighting()
@@ -386,29 +528,24 @@ function lighting()
 }
 
 function animate(t) {
-    // note: three.js includes requestAnimationFrame shim
-    //requestAnimationFrame( animate );
-    //render();
     
-    //camera.position.x = Math.sin(t/1000)*300;
-    //camera.position.y = Math.sin(t/1000)*300;//150;
-    //camera.position.z = Math.cos(t/1000)*300;
+    // Update the trackball control target so the rotation, zooming and
+    // panning make sense
+    VizControls.controls.target.setX(TimeLine.mapCursor._mapObj.position.x)
     
-    // you need to update lookAt every frame
-    //camera.lookAt(scene.position);
-    // renderer automatically clears unless autoClear = false
-    
+    // Update the camera view direction to continue looking at the cursor
+    VizControls.camera.lookAt(TimeLine.mapCursor._mapObj.position);
     
     renderer.render(scene, VizControls.camera);
+    
     window.requestAnimationFrame(animate, renderer.domElement);
-    controls.update();
-    stats.update();
+    
+    VizControls.controls.update(clock.getDelta());
+    
+    stats.update(clock.getDelta());
 }
 
 function render() {
-    //data[0].rotation.x += 0.01;
-    //data[0].rotation.y += 0.02;
-
     renderer.render( scene, camera );
 }
 
@@ -497,17 +634,28 @@ var Timer = {
     */
     start : function() {
         if ( ! this._started ) {
-            this._curTick = Date.now();
-            
             // Setup communication handlers
             socket.on('res-time-sync', this._sync.bind(this));
             
             // Start the timer
-            //this._to = window.setTimeout(this._tick, this._timeToNextInterval(), this);
             this._tick(this);
             
             this._started = true;
+            
+            // Since we're just starting out force a GUI update
+            $(window).trigger('clock-update', [{
+                cursorTime : this._curTick,
+                currentTime: this._curTick
+            }]);
         }
+    },
+    
+    getTime : function () {
+        return this._curTick;
+    },
+    
+    getResolution : function () {
+        return this._resolution;
     },
     
     /**
@@ -515,7 +663,7 @@ var Timer = {
     */
     _tick : function(self) {
         // Update time
-        self._curTick = Date.now();
+        self._curTick = self._nowModResolution();
         
         // Initiate a server sync if it's time
         if (self._lastsync === null ||
@@ -534,9 +682,23 @@ var Timer = {
         }
         
         // Fire tick event
-        $(window).trigger('clock-update', [{curTick : self._curTick}]);
+        $(window).trigger('clock-tick', [{curTick : self._curTick}]);
         
         self._to = window.setTimeout(self._tick, self._timeToNextInterval(), self);
+    },
+    
+    _nowModResolution : function() {
+        var now = new Date();
+        
+        var nowModRes = (new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+            now.getHours(),
+            now.getMinutes()
+        )).getTime();
+        
+        return nowModRes;
     },
     
     /**
@@ -549,18 +711,6 @@ var Timer = {
     },
     
     _timeToNextInterval : function(){
-        var d1 = new Date(this._curTick),
-            ttni;
-        
-        //if (this._lastsync) {
-        //    ttni = this._lastsync + this._resolution - Date.now();
-        //} else {
-        //    // This is broke
-        //    ttni = 0;
-        //}
-        
-        ttni = 60 - (new Date()).getSeconds();
-        
-        return ttni * 1000;
+        return (60 - (new Date()).getSeconds()) * 1000;
     }
 }

@@ -61,6 +61,11 @@ header h1{
     */
 }
 
+#uiContainer .time-in-past {
+    color: #559;
+    font-weight: bold;
+}
+
 #accordion{
     opacity: 0.6;
 }

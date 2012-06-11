@@ -7,17 +7,24 @@ tvizui = {
         });
         
         $(window).bind('clock-update', function(event, timer_data){
-            var d = new Date(timer_data.curTick);
+            var d = new Date(timer_data.cursorTime);
             
             var t_string = d.getFullYear() + '-' +
                            pad(d.getMonth()) + '-' +
-                           pad(d.getDay()) + ' ' +
+                           pad(d.getDate()) + ' ' +
                            pad(d.getHours()) + ':' +
                            pad(d.getMinutes());
             
             $('#timer-clock').html(t_string);
+            
+            if (timer_data.cursorTime != timer_data.currentTime) {
+                if ( ! $('#timer-clock').hasClass('time-in-past')) {
+                    $('#timer-clock').addClass('time-in-past');
+                }
+            } else {
+                $('#timer-clock').removeClass('time-in-past');
+            }
         });
-        
         
         // Date slider
         $( "#tviz-ui-range" ).slider({
