@@ -1,5 +1,7 @@
 
 tvizui = {
+    _loadCount : 0,
+    
     build : function (){
         // Accordion containers
         $("#tviz-accordion").accordion({
@@ -37,6 +39,26 @@ tvizui = {
                 $( "#amount" ).val( "$" + ui.values[ 0 ] + " - $" + ui.values[ 1 ] );
             }
         });
+    },
+    
+    showDetail : function(tweet) {
+        console.log(tweet);
+    },
+    
+    setLoading : function() {
+        this._loadCount += 1;
+        
+        if (this._loadCount > 0) {
+            $('#loader').fadeIn('slow');
+        }
+    },
+    
+    unsetLoading : function() {
+        this._loadCount = Math.min( this._loadCount - 1, 0 );
+        
+        if (this._loadCount == 0) {
+            $('#loader').fadeOut('slow');
+        }
     }
     
 }

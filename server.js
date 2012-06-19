@@ -124,17 +124,13 @@ io.sockets.on('connection', function (socket) {
 		'no-timestamp' : 2
 	}	
 	
-    socket.on('get-result', function (data) {
-		tlog.debug("Received request <<get_result>>");
-		//console.log("");
-		//console.log(data);
+    socket.on('req-dataset', function (data) {
+		tlog.debug("Received request <<req-dataset>");
 		
 		var _query = {"processed":false};
 		
 		for (var d in data)
 			_query[d] = data[d];
-		
-		console.log(_query);
 		
 		db.collection(config.mongodb.collections.raw, function(err, collection) {
 			var t = collection.find(_query).toArray(function(err, items) {
@@ -148,8 +144,36 @@ io.sockets.on('connection', function (socket) {
 						g: items[i].data.geo
 					});
 				}
-				console.log("sending results");
-				socket.emit('result', prunedItems);
+				//console.log("sending results");
+				socket.emit('res-dataset', prunedItems);
+			});
+		});
+      
+    });
+    
+    socket.on('req-detail', function (data) {
+		tlog.debug("Received request <<req-detail>>");
+		
+        console.log(data);
+        
+		var _query = {"data.id_str" : {$eq: data.id}};
+		
+        console.log(_query);
+        
+		db.collection(config.mongodb.collections.raw, function(err, collection) {
+			var t = collection.find(_query).toArray(function(err, items) {
+				console.log(items);
+				//var prunedItems = [];
+				//for (var i = 0; i < items.length; i++){
+				//	d = new Date(items[i].data.created_at);
+				//	prunedItems.push({
+				//		i: items[i].data.id,
+				//		t: d.getTime(),
+				//		g: items[i].data.geo
+				//	});
+				//}
+				////console.log("sending results");
+				//socket.emit('res-dataset', prunedItems);
 			});
 		});
       

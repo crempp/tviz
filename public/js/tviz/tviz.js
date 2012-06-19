@@ -6,9 +6,11 @@ var PI_2 = PI / 2;
 var PI_4 = PI / 4;
 
 var renderer, scene, stats;
-var sphere, uniforms, attributes;
-var vc1;
-var conn;
+//var sphere, uniforms, attributes;
+//var vc1;
+//var conn;
+
+var socket;
 
 var clock = new THREE.Clock();
 
@@ -20,12 +22,39 @@ var VIZ_DEBUG = true;
 
 var data = []
 
+var settings = {
+    tweet_color          : 0xff0000, // Red
+    tweet_color_selected : 0xffffff, // White
+    select_button        : 1 // Left click
+}
+
 /**
  * init
  *
 */
 function init() {
-    connect(initializeViz);
+    // Connect to the socket server
+    connect()
+    
+    // Initialize the TweetBox
+    TweetBox.init();
+    
+    // Initialize the visualization
+    initializeViz();
+}
+
+// The socket is global at the moment to make registering 'on'
+// events easier
+function connect() {
+    _log.notice("Connecting to IO socket...");
+    
+    socket = io.connect(config.io_url,{
+        // Options
+    });
+    
+    socket.on('started', function (data) {
+        _log.notice("IO socket connected");
+    });
 }
 
 function resizeScreen(){
@@ -385,8 +414,9 @@ var VizControls = {
     near      : 0.1,
     far       : 10000,
     
-    camera   : null,
-    controls : null,
+    camera    : null,
+    controls  : null,
+    projector : null,
     
     initCamera : function(){
         this.camera = new THREE.PerspectiveCamera(
@@ -425,76 +455,40 @@ var VizControls = {
         this.controls.dynamicDampingFactor = 0.1;
         this.controls.keys        = [ 65, 83, 68 ];
         
-        window.addEventListener('DOMMouseScroll', this.onDocumentMouseWheel, false);
+        this.projector = new THREE.Projector();
+        
         window.addEventListener('mousewheel', this.onDocumentMouseWheel, false);
+        window.addEventListener('mousedown', this.onDocumentMouseDown.bind(this), true);
     },
     
     onDocumentMouseWheel : function ( event ) {
         TimeLine.updateCursor(event.wheelDeltaY);
+    },
+    
+    onDocumentMouseDown : function ( event ) {
+        if (event.which == settings.select_button) {
+            
+            TweetBox.deselectAll();
+            
+            var vector = new THREE.Vector3( ( event.clientX / window.innerWidth ) * 2 - 1,
+                                            - ( event.clientY / window.innerHeight ) * 2 + 1,
+                                            0.5 );
+            
+            this.projector.unprojectVector( vector, this.camera );
+            
+            var ray = new THREE.Ray( this.camera.position,
+                                     vector.subSelf( this.camera.position ).normalize() );
+            
+            var intersects = TweetBox.intersectObjects(ray);
+            
+            if ( intersects.length > 0 ) {
+                intersects[0].o3d.material.color.setHex( settings.tweet_color_selected );
+                TweetBox.setSelected(intersects[0]);
+                //tvizui.showDetail(intersects[0]);
+            }
+        }
     }
 };
-
-function drawDebug()
-{
-    
-}
-
-function drawData(data)
-{
-    _log.debug("Drawing data");
-    //console.log(data)
-    // create the sphere's material
-    var sphereMaterial = new THREE.MeshLambertMaterial({
-        color: 0xCC0000
-    });
-    
-    // set up the sphere vars
-    var radius   = 2,
-        segments = 8,
-        rings    = 8;
-    
-    // Group data by timestamp
-    //var groups = {};
-    //for (var i = 0; i < data.length; i++){
-    //    if ( ! (data[i].t in groups) ){
-    //        groups[data[i].t] = [];
-    //    }
-    //    groups[data[i].t].push(data[i]);
-    //}
-    
-    //for (var ts in groups){
-    //    //console.log(ts + " - " + groups[ts].length + " items");
-    //    for (var i = 0; i < groups[ts].length; i++){
-    //        //console.log("    " + groups[ts][i].i);
-    //    }
-    //}
-    
-    //console.log(data.length + " tweets")
-    for (var i = 0; i < data.length; i++){
-        var scaledTime = TimeLine.convertTimeToX(data[i].t);
-        
-        var sphere = new THREE.Mesh(
-          new THREE.SphereGeometry(
-            radius,
-            segments,
-            rings),
-          sphereMaterial
-        );
-        
-        sphere.position.x = TimeLine.convertTimeToX(data[i].t);
-        
-        newPos = MillerCylindricalToXY(data[i].g.coordinates)
-        
-        sphere.position.y = newPos[0];
-        sphere.position.z = newPos[1];
-        
-        //data.push(sphere);
-        // add the sphere to the scene
-        scene.add(sphere);
-        
-    }
-    
-}
 
 function MillerCylindricalToXY(pos){
     var latScale = 1,
@@ -509,7 +503,7 @@ function lighting()
     // create a point light
     var pointLight1 = new THREE.PointLight(0xFFFFFF);
     // set its position
-    pointLight1.position.x = 10;
+    pointLight1.position.x = 500;
     pointLight1.position.y = 50;
     pointLight1.position.z = 130;
     
@@ -517,14 +511,10 @@ function lighting()
     scene.add(pointLight1);
     
     // create a point light
-    var pointLight2 = new THREE.PointLight(0xFFFFFF);
-    // set its position
-    pointLight2.position.x = -10;
-    pointLight2.position.y = -50;
-    pointLight2.position.z = -50;
+    var ambientLight1 = new THREE.AmbientLight(0xFFFFFF);
     
     // add to the scene
-    scene.add(pointLight2);
+    //scene.add(ambientLight1);
 }
 
 function animate(t) {
@@ -561,43 +551,12 @@ function error(msg)
 }
 
 // Global the socket for testing
-var socket = 0;
-
-var serverTimeDelta = 0;
-function connect(cb){
-    _log.notice("Connecting to IO socket...");
-
-    // Global the socket for testing
-    //var socket = io.connect('http://localhost');
-    socket = io.connect(config.io_url,{
-        // Options
-    });
-
-    cb();
-    
-    socket.on('started', function (data) {
-        _log.notice("IO socket connected");
-        
-        //console.log("asking for results");
-        
-        var query = {"data.geo" : {$ne: null}};
-        
-        socket.emit('get-result', query);
-    });
-    
-    socket.on('result', function (data) {
-        //_log.debug("IO socket result recieved - " + data.length + " results");
-        _log.debug("[IO] Received result <<result>>");
-        
-        drawData(data);
-    });
-    
-    
-    //socket.on('res-time-sync', function (data) {
-    //    _log.debug("[IO] Received result {res-time-sync}");
-    //    console.log(data)
-    //});
-}
+//var socket = 0;
+//
+//var serverTimeDelta = 0;
+//function connect(cb){
+//    
+//}
 
 /**
  * The timer
@@ -712,5 +671,118 @@ var Timer = {
     
     _timeToNextInterval : function(){
         return (60 - (new Date()).getSeconds()) * 1000;
+    }
+}
+
+
+var TweetBox = {
+    _socket : null,
+    
+    _tweetHash : {},
+    
+    init : function() {
+        socket.on('started', this._loadData.bind(this));
+        
+        socket.on('res-dataset', this._handleData.bind(this));
+    },
+    
+    intersectObjects : function (ray) {
+        var intersects = [];
+        for (id in this._tweetHash) {
+            //console.log(ray.intersectObject(this._tweetHash[id].o3d))
+            if (ray.intersectObject(this._tweetHash[id].o3d).length > 0) {
+                intersects.push(this._tweetHash[id]);
+            }
+        }
+        
+        return intersects;
+    },
+    
+    deselectAll : function() {
+        for (id in this._tweetHash) {
+            this._tweetHash[id].o3d.material.color.setHex( settings.tweet_color );
+            this._tweetHash[id].selected = false;
+        }
+    },
+    
+    setSelected : function(tweet) {
+        tweet.selected = true;
+        console.log("asking for details on")
+        console.log(tweet)
+        socket.emit('req-detail', {id: tweet.i});
+    },
+    
+    _loadData : function(data) {
+        // Ask for data
+        var query = {"data.geo" : {$ne: null}};
+        
+        tvizui.setLoading();
+        socket.emit('req-dataset', query);
+    },
+    
+    _handleData : function(data) {
+        _log.debug("[IO] Received res-dataset <<result>>");
+        
+        tvizui.unsetLoading();
+        
+        for (var i = 0; i < data.length; i++){
+            this._tweetHash[data[i].i] = {
+                i          : data[i].i,
+                t          : data[i].t,
+                coordinates: data[i].g.coordinates,
+                selected   : false,
+                o3d        : null
+            };
+        }
+        
+        this._draw();
+    },
+    
+    _draw : function () {
+        _log.debug("Drawing data");
+        
+        // set up the sphere vars
+        var radius   = 2,
+            segments = 8,
+            rings    = 8;
+        
+        for (id in this._tweetHash) {
+            var sphere = new THREE.Mesh(
+                new THREE.SphereGeometry(
+                  radius,
+                  segments,
+                  rings),
+                // create the sphere's material
+                new THREE.MeshLambertMaterial({
+                    color: settings.tweet_color
+                })
+            );
+            
+            mapPos = MillerCylindricalToXY(this._tweetHash[id].coordinates);
+            
+            sphere.position.x = TimeLine.convertTimeToX(this._tweetHash[id].t);
+            sphere.position.y = mapPos[0];
+            sphere.position.z = mapPos[1];
+            
+            this._tweetHash[id].o3d = sphere;
+            
+            // add the sphere to the scene
+            scene.add(sphere);
+            
+        }
+    },
+    
+    _dateClamp : function() {
+        var now = new Date();
+        
+        var nowModRes = (new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+            now.getHours(),
+            now.getMinutes()
+        )).getTime();
+        
+        return nowModRes;
     }
 }

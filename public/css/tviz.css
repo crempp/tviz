@@ -14,16 +14,19 @@ html, button, input, select, textarea {
 }
 
 header{
-    right: 115px;
+    right: 0px;
     text-align: right;
     position: absolute;
     top: 10px;
+    width: 781px;
 }
 header h1{
     font-family: Futura, ‘Century Gothic’, AppleGothic, sans-serif;
     color: #2d2d2d;
     font-size: 44px;
     margin-top: 0px;
+    margin-right: 40px;
+    float: left;
 }
 
 #viz_wrapper{
@@ -107,4 +110,13 @@ header h1{
 }
 #viz_error h1{
     color: #A8000C
+}
+
+#loader {
+    width: 50px;
+    height: 50px;
+    float: right;
+    margin-right: 40px;
+    margin-top: 5px;
+    display: none;
 }
