@@ -51,6 +51,7 @@ function handler (request, response) {
     
     // Special requests
     if (uri == '/tviz_config.js'){
+	tlog.debug("    config.js");
         var client_config = "var config = " + JSON.stringify(config.client) + ";";
         
         response.writeHead(200, {"Content-Type": "application/javascript"});
@@ -60,7 +61,11 @@ function handler (request, response) {
     }
     
     fs.exists(filename, function(exists) {
-        console.log(filename);
+        if (filename.slice(-1) === "/") {
+            filename += "index.html";
+        }
+
+        tlog.debug("    request for " + filename);
         if(!exists) {
             response.writeHead(404, {"Content-Type": "text/plain"});
             response.write("404 Not Found\n");
